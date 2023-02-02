@@ -1,3 +1,3 @@
 build-AddMember:
-	cargo lambda build
-	cp ./target/lambda/add-member/bootstrap $(ARTIFACTS_DIR)
+	cd $(PWD); cargo lambda build
+	cp $(PWD)/target/lambda/add-member/bootstrap $(ARTIFACTS_DIR)

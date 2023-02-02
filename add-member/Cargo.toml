@@ -5,6 +5,7 @@ authors = ["mdsimmo"]
 edition = "2021"
 
 [dependencies]
+app-core = { path = "../app-core" }
 lambda_http = "0.7"
 lambda_runtime = "0.7"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

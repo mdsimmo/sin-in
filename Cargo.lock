@@ -6,6 +6,7 @@ version = 3
 name = "add-member"
 version = "0.1.0"
 dependencies = [
+ "app-core",
  "http",
  "lambda_http",
  "lambda_runtime",

@@ -1,3 +1,4 @@
+use app_core::add;
 use lambda_http::{service_fn, Error};
 
 #[tokio::main]

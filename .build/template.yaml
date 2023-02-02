@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'sin(ln)
+
+  The headless server code for runnning the sin(ln) app.
+
+  '
+Globals:
+  Function:
+    Timeout: 3
+    Handler: bootstrap.is.the.handler
+    Runtime: provided.al2
+    Architectures:
+    - x86_64
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Description: sin(ln) API
+      Name: sinln
+      DisableExecuteApiEndpoint: true
+      Domain:
+        DomainName: api.sinln.mdsimmo.com
+        CertificateArn: arn:aws:acm:ap-southeast-2:400928329577:certificate/af000f61-c599-4b7e-ac68-8fc46f8eebb5
+  AddMember:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-add-member
+      CodeUri: AddMember
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId:
+              Ref: HttpApi
+            Path: /add-member
+            Method: Any
+    Metadata:
+      SamResourceId: AddMember
