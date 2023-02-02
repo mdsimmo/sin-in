@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "app-core",
+  "add-member",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["mdsimmo"]
+edition = "2021"
+
