@@ -2,6 +2,7 @@
 members = [
   "app-core",
   "add-member",
+  "edit-member",
 ]
 
 [workspace.package]

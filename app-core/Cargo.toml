@@ -2,5 +2,7 @@
 name = "app-core"
 version.workspace = true
 authors.workspace = true
+edition.workspace = true
 
 [dependencies]
+serde = "1"

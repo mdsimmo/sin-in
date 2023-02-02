@@ -1,14 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+extern crate serde;
+use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Member {
+    name: String,
+    last_name: String,
+    address: Option<String>,
+    mobile: Option<String>,
 }

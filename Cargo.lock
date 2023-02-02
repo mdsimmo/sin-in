@@ -20,6 +20,9 @@ dependencies = [
 [[package]]
 name = "app-core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "async-stream"
@@ -96,6 +99,21 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
+]
+
+[[package]]
+name = "edit-member"
+version = "0.1.0"
+dependencies = [
+ "app-core",
+ "http",
+ "lambda_http",
+ "lambda_runtime",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]

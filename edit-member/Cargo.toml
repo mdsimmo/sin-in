@@ -1,5 +1,5 @@
 [package]
-name = "add-member"
+name = "edit-member"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
