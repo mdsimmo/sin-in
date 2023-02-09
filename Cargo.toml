@@ -3,6 +3,7 @@ members = [
   "app-core",
   "add-member",
   "edit-member",
+  "list-members",
 ]
 
 [workspace.package]

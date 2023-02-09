@@ -1,11 +1,8 @@
-use std::collections::HashMap;
 use app_core::Member;
 use http::Response;
-use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt};
-use rand::Rng;
-use serde::{Deserialize, Serialize};
+use lambda_http::{run, http::StatusCode, service_fn, Error, Request};
 use serde_json::json;
-use aws_sdk_dynamodb::{Client, model::AttributeValue};
+use aws_sdk_dynamodb::{Client};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -40,51 +37,42 @@ pub async fn function_error_wrap(event: Request) -> Result<app_core::StringRespo
 }
 
 
-pub async fn function_handler(event: Request) -> Result<app_core::StringResponse, Error> {
-    log::info!("Event: {:?}", event);
-    
-    // decrypt the request
-    let raw_data = event.payload::<Data>()?;
-    log::info!("Data: {:?}", raw_data);
-    let data = match raw_data {
-        Some(x) => x,
-        None => return Err(Box::new(app_core::RuntimeError::from_str("No data given")))
-    };
-
-    // Assign a new id
-    let id = {
-        let id_time = chrono::Utc::now();
-        let id_random = rand::thread_rng().gen::<u32>();
-        let mut id_string = id_time.format("%Y-%m-%d-%H:%M:%S-").to_string();
-        id_string.push_str(&id_random.to_string());
-        id_string
-    };
-    log::info!("Id: {:?}", id);
-
-    // Put the member in dynamodb
+pub async fn function_handler(_event: Request) -> Result<app_core::StringResponse, Error> {
+    // Get all members in dynamodb
     let config = aws_config::load_from_env().await;
     let client = Client::new(&config);
-    let table_response = client.put_item()
+    let table_response = client.scan()
         .table_name("sinln-members")
-        .set_item(Some(HashMap::from(&data.member)))
-        .item("id",AttributeValue::S(id.clone()))
-        .send().await?;
-   log::info!("Table update: {:?}", table_response);
+        .send().await?;    
+    
+    log::info!("Table data: {:?}", table_response);
+
+    // Convert json into members
+    let result = table_response.items()
+        .map(|items| {
+            let members: Vec<Result<Member, String>> = items.into_iter().map(|row| {
+                match Member::from_row(row) {
+                    Ok(m) => Ok(m),
+                    Err(err) => Err(err.details()),
+                }
+            }).collect();
+            members
+        });
+    
+    // TODO Handle the case of None
+    let members = match result {
+        Some(x) => x,
+        None => return Err(Box::new(app_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
+    };
     
     // Send response
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
         .body(json!({
-            "id": id,
-            "member": data.member, 
+            "members": members, 
           }).to_string())
         .map_err(Box::new)?;
 
     Ok(response)
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct Data {
-    member: Member,
 }

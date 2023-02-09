@@ -23,6 +23,14 @@ Resources:
         DomainName: api.sinln.mdsimmo.com
         CertificateArn: arn:aws:acm:ap-southeast-2:400928329577:certificate/af000f61-c599-4b7e-ac68-8fc46f8eebb5
 
+  MembersTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: sinln-members
+      PrimaryKey:
+        Name: id
+        Type: String
+
   AddMember:
     Type: AWS::Serverless::Function
     Properties:
@@ -35,6 +43,28 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /add-member
             Method: Any
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+  
+  ListMembers:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-list-members
+      CodeUri: list-members/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /list-members
+            Method: Any
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+
   EditMember:
     Type: AWS::Serverless::Function
     Properties:
