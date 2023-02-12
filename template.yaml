@@ -31,17 +31,17 @@ Resources:
         Name: id
         Type: String
 
-  AddMember:
+  UpdateMember:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: sinln-add-member
-      CodeUri: add-member/
+      FunctionName: sinln-update-member
+      CodeUri: update-member/
       Events:
         HttpApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref HttpApi
-            Path: /add-member
+            Path: /update-member
             Method: Any
       Policies:
         - AWSLambdaExecute
@@ -65,15 +65,15 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref MembersTable
 
-  EditMember:
+  DeleteMember:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: sinln-edit-member
-      CodeUri: edit-member/
+      FunctionName: sinln-delete-member
+      CodeUri: delete-member/
       Events:
         HttpApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref HttpApi
-            Path: /edit-member
+            Path: /delete-member
             Method: Any

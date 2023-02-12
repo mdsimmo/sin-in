@@ -9,11 +9,11 @@ use serde_json::json;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Member {
-    id: Option<String>,
-    name: String,
-    email: String,
-    address: Option<String>,
-    mobile: Option<u64>,
+    pub id: Option<String>,
+    pub name: String,
+    pub email: String,
+    pub address: Option<String>,
+    pub mobile: Option<u64>,
 }
 
 impl Member {

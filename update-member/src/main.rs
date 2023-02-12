@@ -5,7 +5,7 @@ use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt}
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use aws_sdk_dynamodb::{Client, model::AttributeValue};
+use aws_sdk_dynamodb::{Client, model::{ReturnValue}};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -50,34 +50,43 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
         Some(x) => x,
         None => return Err(Box::new(app_core::RuntimeError::from_str("No data given")))
     };
+    let mut member = data.member;
 
-    // Assign a new id
-    let id = {
+    // If no id assigned, assign one
+    if member.id == None {
         let id_time = chrono::Utc::now();
         let id_random = rand::thread_rng().gen::<u32>();
         let mut id_string = id_time.format("%Y-%m-%d-%H:%M:%S-").to_string();
         id_string.push_str(&id_random.to_string());
-        id_string
+        member.id = Some(id_string)
     };
-    log::info!("Id: {:?}", id);
+    log::info!("New member: {:?}", member.id);
 
     // Put the member in dynamodb
     let config = aws_config::load_from_env().await;
     let client = Client::new(&config);
     let table_response = client.put_item()
         .table_name("sinln-members")
-        .set_item(Some(HashMap::from(&data.member)))
-        .item("id",AttributeValue::S(id.clone()))
+        .set_item(Some(HashMap::from(&member)))
+        .return_values(ReturnValue::AllOld)
         .send().await?;
-   log::info!("Table update: {:?}", table_response);
+    log::info!("Table update: {:?}", table_response);
     
+    // Read the old member (if any)
+    let old_member = table_response.attributes()
+        .map(|attributes| Member::from_row(attributes));
+    let old_member = match old_member {
+        Some(Ok(m)) => Some(m),
+        _ => None,
+    };
+
     // Send response
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
         .body(json!({
-            "id": id,
-            "member": data.member, 
+            "member": member, 
+            "old-member": old_member,
           }).to_string())
         .map_err(Box::new)?;
 

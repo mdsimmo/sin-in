@@ -1,5 +1,5 @@
 [package]
-name = "add-member"
+name = "delete-member"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -16,6 +16,3 @@ http = "0.2.8"
 tracing-subscriber = "0.3.16"
 aws-sdk-dynamodb = "0.24.0"
 aws-config = "0.54.1"
-time = "0.3.17"
-chrono = "0.4.23"
-rand = "0.8.5"

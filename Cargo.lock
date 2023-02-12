@@ -3,26 +3,6 @@
 version = 3
 
 [[package]]
-name = "add-member"
-version = "0.1.0"
-dependencies = [
- "app-core",
- "aws-config",
- "aws-sdk-dynamodb",
- "chrono",
- "http",
- "lambda_http",
- "lambda_runtime",
- "log",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "time 0.3.17",
- "tokio",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -619,21 +599,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "digest"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8168378f4e5023e7218c89c891c0fd8ecdb5e5e4f18cb78f38cf245dd021e76f"
-dependencies = [
- "block-buffer",
- "crypto-common",
- "subtle",
-]
-
-[[package]]
-name = "edit-member"
+name = "delete-member"
 version = "0.1.0"
 dependencies = [
  "app-core",
+ "aws-config",
+ "aws-sdk-dynamodb",
  "http",
  "lambda_http",
  "lambda_runtime",
@@ -642,6 +613,17 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8168378f4e5023e7218c89c891c0fd8ecdb5e5e4f18cb78f38cf245dd021e76f"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -1922,6 +1904,26 @@ name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
+
+[[package]]
+name = "update-member"
+version = "0.1.0"
+dependencies = [
+ "app-core",
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "chrono",
+ "http",
+ "lambda_http",
+ "lambda_runtime",
+ "log",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "time 0.3.17",
+ "tokio",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "url"
