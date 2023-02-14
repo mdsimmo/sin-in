@@ -50,10 +50,10 @@ pub async fn function_handler(_event: Request) -> Result<app_core::StringRespons
     // Convert json into members
     let result = table_response.items()
         .map(|items| {
-            let members: Vec<Result<Member, String>> = items.into_iter().map(|row| {
+            let members: Vec<Member> = items.into_iter().filter_map(|row| {
                 match Member::from_row(row) {
-                    Ok(m) => Ok(m),
-                    Err(err) => Err(err.details()),
+                    Ok(m) => Some(m),
+                    Err(err) => None,
                 }
             }).collect();
             members
