@@ -1,10 +1,10 @@
 extern crate serde;
 extern crate model;
 extern crate aws_sdk_dynamodb;
-use std::collections::HashMap;
+use std::{collections::HashMap};
 use aws_sdk_dynamodb::model::AttributeValue;
 use serde::{Deserialize, Serialize};
-use lambda_http::http;
+use lambda_http::{http::{self}, Error, Response};
 use serde_json::json;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -61,7 +61,7 @@ impl Member {
         let id = Member::read_string(data, "id")?.to_string();
         let name = Member::read_string(data, "name")?.to_string();
         let email = Member::read_string(data, "email")?.to_string();
-        let address = Member::read_string_optional(data, "name").map(|x| x.to_string());
+        let address = Member::read_string_optional(data, "address").map(|x| x.to_string());
         let mobile = Member::read_integer_optional(data, "mobile");
         Ok(Member {
             id: Some(id),
@@ -77,6 +77,9 @@ impl From<&Member> for HashMap<String, AttributeValue> {
     // TODO generate this using a macro
     fn from(member: &Member) -> Self {
         let mut map = HashMap::new();
+        if let Some(id) = &member.id {
+            map.insert("id".to_string(), AttributeValue::S(id.clone()));
+        }
         map.insert("name".to_string(), AttributeValue::S(member.name.clone()));
         map.insert("email".to_string(), AttributeValue::S(member.email.clone()));
         if let Some(address) = &member.address {
@@ -142,5 +145,25 @@ pub fn wrap_error<F>(handler: F) -> impl Fn(lambda_http::Request)->http::Result<
             }
         };
         reponse
+    }
+}
+
+pub fn add_cors(response: Result<StringResponse, Error>) -> Result<StringResponse, Error> {
+    match response {
+        Ok(msg) => {
+            let mut builder = Response::builder();
+            {
+                let headers = builder.headers_mut().unwrap();
+                headers.clone_from(msg.headers());
+                //headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("http://localhost:3000"));
+            }
+            let r = builder
+                .status(msg.status())
+                .version(msg.version())
+                .header("access-control-allow-origin", "http://localhost:3000")
+                .body(msg.into_body()).map_err(Box::new)?;
+            Ok(r)
+        }
+        Err(e) => Err(e)
     }
 }

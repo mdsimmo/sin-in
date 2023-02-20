@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use app_core::Member;
+use app_core::{Member, add_cors};
 use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
 use http::Response;
 use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt};
@@ -18,9 +18,15 @@ async fn main() -> Result<(), Error> {
     run(service_fn(function_error_wrap)).await
 }
 
-pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> { 
+pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> {
+    if (event.method() == http::Method::OPTIONS) {
+        return Ok(Response::builder()
+            .status(200)
+            .body("".to_string())
+            .unwrap())
+    }
     let result = function_handler(event).await;
-    return match result {
+    let result = match result {
         Ok(r) => Ok(r),
         Err(e) => {
             let new_response = Response::builder()
@@ -36,7 +42,8 @@ pub async fn function_error_wrap(event: Request) -> Result<app_core::StringRespo
             .map_err(Box::new)?;
             Ok(new_response)
         }
-    }
+    };
+    return add_cors(result);
 }
 
 pub async fn function_handler(event: Request) -> Result<app_core::StringResponse, Error> {
@@ -50,7 +57,7 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
     let id = data.id;
     let request_map = {
         let mut map = HashMap::new();
-        map.insert("id".to_string(), AttributeValue::S("asd".to_string()));
+        map.insert("id".to_string(), AttributeValue::S(id.clone()));
         map
     };
 
@@ -60,8 +67,9 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
         .table_name("sinln-members")
         .set_key(Some(request_map))
         .return_values(ReturnValue::AllOld)
-        .send().await?;
+        .send().await;
     log::info!("Table update: {:?}", table_response);
+    let table_response = table_response?;
 
     // Read the old member (if any)
     let old_member = table_response.attributes()

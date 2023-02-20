@@ -26,6 +26,10 @@ Resources:
         AllowOrigins:
           - "http://localhost:3000"
           - "https://sinln.mdsimmo.com"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - "*"
 
   MembersTable:
     Type: AWS::Serverless::SimpleTable
@@ -81,3 +85,7 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /delete-member
             Method: Any
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable

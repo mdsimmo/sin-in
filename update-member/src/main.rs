@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use app_core::Member;
+use app_core::{Member, add_cors};
 use http::Response;
 use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt};
 use rand::Rng;
@@ -19,13 +19,20 @@ async fn main() -> Result<(), Error> {
 }
 
 pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> { 
+    if (event.method() == http::Method::OPTIONS) {
+        return Ok(Response::builder()
+            .status(200)
+            .body("".to_string())
+            .unwrap())
+    }
     let result = function_handler(event).await;
-    return match result {
+    let result = match result {
         Ok(r) => Ok(r),
         Err(e) => {
             let new_response = Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .header("Content-Type", "application/json")
+            .header("Access-Control-Allow-Origin", "http://localhost:3000")
             .body(json!({
                 "error": e.to_string(),
                 "source": match e.source() {
@@ -36,7 +43,8 @@ pub async fn function_error_wrap(event: Request) -> Result<app_core::StringRespo
             .map_err(Box::new)?;
             Ok(new_response)
         }
-    }
+    };
+    return add_cors(result);
 }
 
 
@@ -69,9 +77,10 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
         .table_name("sinln-members")
         .set_item(Some(HashMap::from(&member)))
         .return_values(ReturnValue::AllOld)
-        .send().await?;
+        .send().await;
     log::info!("Table update: {:?}", table_response);
-    
+    let table_response = table_response?;
+
     // Read the old member (if any)
     let old_member = table_response.attributes()
         .map(|attributes| Member::from_row(attributes));

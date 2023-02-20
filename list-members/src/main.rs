@@ -1,4 +1,4 @@
-use app_core::Member;
+use app_core::{Member, add_cors};
 use http::Response;
 use lambda_http::{run, http::StatusCode, service_fn, Error, Request};
 use serde_json::json;
@@ -16,8 +16,14 @@ async fn main() -> Result<(), Error> {
 }
 
 pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> { 
+    if event.method() == http::Method::OPTIONS {
+        return Ok(Response::builder()
+            .status(200)
+            .body("".to_string())
+            .unwrap())
+    }
     let result = function_handler(event).await;
-    return match result {
+    let result = match result {
         Ok(r) => Ok(r),
         Err(e) => {
             let new_response = Response::builder()
@@ -33,7 +39,8 @@ pub async fn function_error_wrap(event: Request) -> Result<app_core::StringRespo
             .map_err(Box::new)?;
             Ok(new_response)
         }
-    }
+    };
+    return add_cors(result);
 }
 
 
@@ -43,9 +50,9 @@ pub async fn function_handler(_event: Request) -> Result<app_core::StringRespons
     let client = Client::new(&config);
     let table_response = client.scan()
         .table_name("sinln-members")
-        .send().await?;    
-    
+        .send().await;
     log::info!("Table data: {:?}", table_response);
+    let table_response = table_response?;
 
     // Convert json into members
     let result = table_response.items()
@@ -53,7 +60,7 @@ pub async fn function_handler(_event: Request) -> Result<app_core::StringRespons
             let members: Vec<Member> = items.into_iter().filter_map(|row| {
                 match Member::from_row(row) {
                     Ok(m) => Some(m),
-                    Err(err) => None,
+                    Err(_err) => None,
                 }
             }).collect();
             members
