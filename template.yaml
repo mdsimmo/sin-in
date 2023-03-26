@@ -50,7 +50,7 @@ Resources:
           Properties:
             ApiId: !Ref HttpApi
             Path: /update-member
-            Method: Any
+            Method: Post
       Policies:
         - AWSLambdaExecute
         - DynamoDBCrudPolicy:
@@ -67,7 +67,7 @@ Resources:
           Properties:
             ApiId: !Ref HttpApi
             Path: /list-members
-            Method: Any
+            Method: Post
       Policies:
         - AWSLambdaExecute
         - DynamoDBCrudPolicy:
@@ -84,7 +84,7 @@ Resources:
           Properties:
             ApiId: !Ref HttpApi
             Path: /delete-member
-            Method: Any
+            Method: Post
       Policies:
         - AWSLambdaExecute
         - DynamoDBCrudPolicy:

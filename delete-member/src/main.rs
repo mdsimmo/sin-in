@@ -19,12 +19,6 @@ async fn main() -> Result<(), Error> {
 }
 
 pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> {
-    if (event.method() == http::Method::OPTIONS) {
-        return Ok(Response::builder()
-            .status(200)
-            .body("".to_string())
-            .unwrap())
-    }
     let result = function_handler(event).await;
     let result = match result {
         Ok(r) => Ok(r),
