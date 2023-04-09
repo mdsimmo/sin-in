@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sin(ln)
+
+  The headless server code for runnning the sin(ln) app.
+
+Globals:
+  Function:
+    Timeout: 3
+    Handler: bootstrap
+    Runtime: provided.al2
+    Architectures:
+      - x86_64
+
+Resources:
+  EmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: "mdsimmo.com"
+      FeedbackAttributes:
+        EmailForwardingEnabled: true
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+
+  EmailReceiveSet:
+    Type: AWS::SES::ReceiptRuleSet
+    Properties:
+      RuleSetName: sinln-receive-set
+  
+  EmailRule:
+    Type: AWS::SES::ReceiptRule
+    DependsOn: 
+      - EmailStoragePolicy
+      - EmailHandlerPolicy
+    Properties:
+      RuleSetName: !Ref EmailReceiveSet
+      Rule:
+        Name: sinln-store-and-forward
+        Enabled: true
+        ScanEnabled: true
+        Actions:
+          - S3Action:
+              BucketName: !Ref EmailStorage
+          - LambdaAction:
+              FunctionArn: !GetAtt EmailHandler.Arn
+
+  EmailStorage:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: sinln-emails
+  
+  EmailStoragePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EmailStorage
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - s3:PutObject
+            Effect: Allow
+            Resource: !Sub
+              - 'arn:aws:s3:::${Bucket}/*'
+              - Bucket: !Ref EmailStorage
+            Principal:
+              Service: ses.amazonaws.com
+            Condition:
+              StringLike:
+                AWS:SourceAccount: !Ref AWS::AccountId
+                AWS:SourceArn: !Sub
+                  - 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:receipt-rule-set/${RuleSet}:receipt-rule/*'
+                  - RuleSet: !Ref EmailReceiveSet
+
+  EmailHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-email-handler
+      CodeUri: email-handler/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: MembersTable
+        - S3CrudPolicy:
+            BucketName: !Ref EmailStorage
+        - SESCrudPolicy:
+            IdentityName: !Ref EmailIdentity
+  
+  EmailHandlerPolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmailHandler
+      Action: lambda:InvokeFunction
+      Principal: ses.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub
+        - 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:receipt-rule-set/${RuleSet}:receipt-rule/*'
+        - RuleSet: !Ref EmailReceiveSet
+
+
+      
+
+
+
+  
+  

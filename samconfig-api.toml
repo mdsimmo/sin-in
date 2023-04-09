@@ -2,10 +2,10 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "sin-ln"
-s3_prefix = "sin-ln"
+stack_name = "sinln-api"
+s3_prefix = "sinln-api"
 region = "ap-southeast-2"
-confirm_changeset = true
+confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-aeiubs44a0lz"

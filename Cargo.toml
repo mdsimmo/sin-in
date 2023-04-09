@@ -4,6 +4,7 @@ members = [
   "update-member",
   "delete-member",
   "list-members",
+  "email-handler",
 ]
 
 [workspace.package]
