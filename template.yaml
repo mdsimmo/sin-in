@@ -285,6 +285,8 @@ Resources:
             BucketName: !Ref EmailInputStore
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailInputQueue.QueueName
+        - SESCrudPolicy:
+            IdentityName: '*'
 
   # Let the handler be called from SQS
   EmailInputHandlerPolicy:
