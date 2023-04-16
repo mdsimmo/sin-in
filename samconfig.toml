@@ -2,11 +2,11 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "sinln-email"
-s3_prefix = "sinln-email"
+stack_name = "sinln"
+s3_prefix = "sinln"
 region = "us-east-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-8e54rlys3o09"
 disable_rollback = true
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1ir7p4g0tpplz"

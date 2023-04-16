@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use app_core::{Member, add_cors};
-use aws_sdk_dynamodb::{Client, model::{AttributeValue, ReturnValue}};
+use app_core::{Topic, add_cors};
+use aws_sdk_dynamodb::{Client, types::{AttributeValue, ReturnValue}};
 use http::Response;
 use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt};
 use serde::{Deserialize, Serialize};
@@ -58,17 +58,17 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
     let config = aws_config::load_from_env().await;
     let client = Client::new(&config);
     let table_response = client.delete_item()
-        .table_name("sinln-members")
+        .table_name("sinln-topics")
         .set_key(Some(request_map))
         .return_values(ReturnValue::AllOld)
         .send().await;
     log::info!("Table update: {:?}", table_response);
     let table_response = table_response?;
 
-    // Read the old member (if any)
-    let old_member = table_response.attributes()
-        .map(|attributes| Member::from_row(attributes));
-    let old_member = match old_member {
+    // Read the old topic (if any)
+    let old_topic = table_response.attributes()
+        .map(|attributes| Topic::from_row(attributes));
+    let old_topic = match old_topic {
         Some(Ok(m)) => Some(m),
         _ => None,
     };
@@ -78,7 +78,7 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
         .header("Content-Type", "application/json")
         .body(json!({
             "id": id,
-            "old-member": old_member, 
+            "old-topic": old_topic, 
           }).to_string())
         .map_err(Box::new)?;
 

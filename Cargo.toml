@@ -1,10 +1,14 @@
 [workspace]
 members = [
   "app-core",
-  "update-member",
-  "delete-member",
-  "list-members",
-  "email-handler",
+  "members-update",
+  "members-delete",
+  "members-list",
+  "topics-update",
+  "topics-delete",
+  "topics-list",
+  "email-input-handler",
+  "email-sender",
 ]
 
 [workspace.package]

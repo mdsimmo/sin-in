@@ -5,7 +5,7 @@ use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt}
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use aws_sdk_dynamodb::{Client, model::{ReturnValue}};
+use aws_sdk_dynamodb::{Client, types::{ReturnValue}};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

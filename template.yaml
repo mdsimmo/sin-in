@@ -1,0 +1,348 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sin(ln)
+
+  The headless server code for runnning the sin(ln) app.
+
+# All lambdas run using rust environment
+Globals:
+  Function:
+    Timeout: 3
+    Handler: bootstrap
+    Runtime: provided.al2
+    Architectures:
+      - x86_64
+
+Resources:
+  # Host name for application
+  DomainCertificate: 
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: 'sinln.mdsimmo.com'
+      SubjectAlternativeNames:
+        - 'api.sinln.mdsimmo.com'
+      ValidationMethod: DNS 
+
+  # Main API endpoint
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Description: sin(ln) API
+      Name: sinln
+      Domain:
+        DomainName: api.sinln.mdsimmo.com
+        CertificateArn: !Ref DomainCertificate
+      CorsConfiguration:
+        AllowOrigins:
+          - "http://localhost:3000"
+          - "https://sinln.mdsimmo.com"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - "*"
+
+  # Database storing member details
+  MembersTable:
+    Type: AWS::Serverless::SimpleTable
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: sinln-members
+      PrimaryKey:
+        Name: id
+        Type: String  
+
+  # Update/Add members API function
+  MembersUpdate:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-members-update
+      CodeUri: members-update/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /members-update
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+  
+  # List members API function
+  MembersList:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-members-list
+      CodeUri: members-list/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /members-list
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+
+  # Delete members API function
+  MembersDelete:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-members-delete
+      CodeUri: members-delete/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /members-delete
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+
+  # Database storing subscription topic details
+  TopicsTable:
+    Type: AWS::Serverless::SimpleTable
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      TableName: sinln-topics
+      PrimaryKey:
+        Name: id
+        Type: String
+
+  # List all topics API function 
+  TopicsList:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-topics-list
+      CodeUri: topics-list/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /topics-list
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TopicsTable
+
+  # Add/Update topics API function
+  TopicsUpdate:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-topics-update
+      CodeUri: topics-update/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /topics-update
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TopicsTable
+
+  # Delete topics API function
+  TopicsDelete:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-topics-delete
+      CodeUri: topics-delete/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /topics-delete
+            Method: Post
+      Policies:
+        - AWSLambdaExecute
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TopicsTable
+  
+  # A verified identity for sending emails from 
+  EmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: "mdsimmo.com"
+      FeedbackAttributes:
+        EmailForwardingEnabled: true
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+
+  # Receipt holder for EmailInputRule
+  EmailInputRuleReceipt:
+    Type: AWS::SES::ReceiptRuleSet
+    Properties:
+      RuleSetName: sinln-email-input-receipt
+  
+  # Rule to store input emails in an s3 bucket, lambda can read them (notified from SNS->SQS->lambda) 
+  EmailInputRule:
+    Type: AWS::SES::ReceiptRule
+    DependsOn: 
+      - EmailInputStorePolicy
+    Properties:
+      RuleSetName: !Ref EmailInputRuleReceipt
+      Rule:
+        Name: sinln-email-input-rule
+        Enabled: true
+        ScanEnabled: true
+        Actions:
+          - S3Action:
+              BucketName: !Ref EmailInputStore
+          - SNSAction:
+              TopicArn: !GetAtt EmailInputSNS.TopicArn
+
+  # Bucket that all input emails get temporarilly stored in
+  EmailInputStore:
+    Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: sinln-input-emails
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  
+  # Let SES write to the email bucket
+  EmailInputStorePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EmailInputStore
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - s3:PutObject
+            Effect: Allow
+            Resource: !Sub
+              - 'arn:aws:s3:::${Bucket}/*'
+              - Bucket: !Ref EmailInputStore
+            Principal:
+              Service: ses.amazonaws.com
+            Condition:
+              StringLike:
+                AWS:SourceAccount: !Ref AWS::AccountId
+                AWS:SourceArn: !Sub
+                  - 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:receipt-rule-set/${RuleSet}:receipt-rule/*'
+                  - RuleSet: !Ref EmailInputRuleReceipt
+  
+  # Linker notification service that handles incoming emails 
+  EmailInputSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: 'sinln-email-input'
+      Subscription:
+        - Protocol: sqs
+          Endpoint: !GetAtt EmailInputQueue.Arn
+  
+  # Queue for all input message to get processed
+  # TODO: Add a deadletter queue
+  EmailInputQueue:
+    Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      QueueName: 'sinln-email-input-queue'
+      MessageRetentionPeriod: 345600 # 4 days
+
+  # All emails in the Input Queue trigger the Email Handler
+  EmailInputTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    DependsOn:
+      - EmailInputHandlerPolicy
+    Properties:
+      Enabled: true
+      EventSourceArn: !GetAtt EmailInputQueue.Arn
+      FunctionName: !GetAtt EmailInputHandler.Arn
+
+  # Function that processes all input emails
+  EmailInputHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-email-input-handler
+      CodeUri: email-input-handler/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TopicsTable
+        - S3CrudPolicy:
+            BucketName: !Ref EmailInputStore
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EmailInputQueue.QueueName
+
+  # Let the handler be called from SQS
+  EmailInputHandlerPolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmailInputHandler
+      Action: lambda:InvokeFunction
+      Principal: sqs.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt EmailInputQueue.Arn
+  
+  EmailOutputQueue:
+    Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      QueueName: sinln-output-queue
+      MessageRetentionPeriod: 345600 # 4 days
+
+  EmailOutputStore:
+    Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: sinln-output-emails
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  EmailSender:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-email-sender
+      CodeUri: email-sender/
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EmailOutputQueue.QueueName
+        - S3CrudPolicy:
+            BucketName: !Ref EmailOutputStore
+        - SESCrudPolicy:
+            IdentityName: !Ref EmailIdentity
+
+  EmailSenderPolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmailSender
+      Action: lambda:InvokeFunction
+      Principal: sqs.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt EmailOutputQueue.Arn
+  
+  EmailSenderTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    DependsOn:
+      - EmailSenderPolicy
+    Properties:
+      Enabled: true
+      EventSourceArn: !GetAtt EmailOutputQueue.Arn
+      FunctionName: !GetAtt EmailSender.Arn

@@ -2,10 +2,75 @@ extern crate serde;
 extern crate model;
 extern crate aws_sdk_dynamodb;
 use std::{collections::HashMap};
-use aws_sdk_dynamodb::model::AttributeValue;
+use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 use lambda_http::{http::{self}, Error, Response};
 use serde_json::json;
+
+fn read_string<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Result<&'a str, RuntimeError> {
+    match data.get(key) {
+        Some(attribute) => match attribute.as_s() {
+            Ok(string) => Ok(&string[..]),
+            Err(_) => {
+                let msg = "Key requires a string: ".to_string() + key;
+                return Err(RuntimeError::from_string(msg))
+            },
+        },
+        None => {
+            let msg = "No value for: ".to_string() + key;
+            return Err(RuntimeError::from_string(msg))
+        },
+    }
+}
+
+fn read_string_optional<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Option<&'a str> {
+    match data.get(key) {
+        Some(attribute) => match attribute.as_s() {
+            Ok(string) => Some(&string[..]),
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+
+fn read_bool(data: &HashMap<String, AttributeValue>, key: &str) -> Result<bool, RuntimeError> {
+    match data.get(key) {
+        Some(attribute) => match attribute.as_bool() {
+            Ok(&bool) => Ok(bool),
+            Err(_) => {
+                let msg = "Key requires a boolean: ".to_string() + key;
+                return Err(RuntimeError::from_string(msg))
+            },
+        },
+        None => {
+            let msg = "No value for: ".to_string() + key;
+            return Err(RuntimeError::from_string(msg))
+        },
+    }
+}
+
+fn read_integer_optional(data: &HashMap<String, AttributeValue>, key: &str) -> Option<u64> {
+    match data.get(key) {
+        Some(attribute) => match attribute.as_n() {
+            Ok(string) => match u64::from_str_radix(&string[..], 10) {
+                Ok(n) => Some(n),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+
+fn read_string_list<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Option<&'a Vec<String>> {
+    match data.get(key) {
+        Some(attribute) => match attribute.as_ss() {
+            Ok(vec) => Some(vec),
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Member {
@@ -14,61 +79,28 @@ pub struct Member {
     pub email: String,
     pub address: Option<String>,
     pub mobile: Option<u64>,
+    pub subscriptions: Vec<String>,
 }
 
 impl Member {
 
-    fn read_string<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Result<&'a str, RuntimeError> {
-        match data.get(key) {
-            Some(attribute) => match attribute.as_s() {
-                Ok(string) => Ok(&string[..]),
-                Err(_) => {
-                    let msg = "Key requires a string: ".to_string() + key;
-                    return Err(RuntimeError::from_string(msg))
-                },
-            },
-            None => {
-                let msg = "No value for: ".to_string() + key;
-                return Err(RuntimeError::from_string(msg))
-            },
-        }
-    }
-
-    fn read_string_optional<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Option<&'a str> {
-        match data.get(key) {
-            Some(attribute) => match attribute.as_s() {
-                Ok(string) => Some(&string[..]),
-                Err(_) => None,
-            },
-            None => None,
-        }
-    }
-
-    fn read_integer_optional<'a>(data: &'a HashMap<String, AttributeValue>, key: &str) -> Option<u64> {
-        match data.get(key) {
-            Some(attribute) => match attribute.as_n() {
-                Ok(string) => match u64::from_str_radix(&string[..], 10) {
-                    Ok(n) => Some(n),
-                    Err(_) => None,
-                },
-                Err(_) => None,
-            },
-            None => None,
-        }
-    }
-
     pub fn from_row(data: &HashMap<String, AttributeValue>) -> Result<Self, RuntimeError> {
-        let id = Member::read_string(data, "id")?.to_string();
-        let name = Member::read_string(data, "name")?.to_string();
-        let email = Member::read_string(data, "email")?.to_string();
-        let address = Member::read_string_optional(data, "address").map(|x| x.to_string());
-        let mobile = Member::read_integer_optional(data, "mobile");
+        let id = read_string(data, "id")?.to_string();
+        let name = read_string(data, "name")?.to_string();
+        let email = read_string(data, "email")?.to_string();
+        let address = read_string_optional(data, "address").map(|x| x.to_string());
+        let mobile = read_integer_optional(data, "mobile");
+        let subscriptions = read_string_list(data, "subscriptions").map_or_else(
+            || vec![],
+            |vec| vec.to_owned()
+        );
         Ok(Member {
             id: Some(id),
             name,
             email,
             address,
             mobile,
+            subscriptions,
         })
     }
 }
@@ -88,6 +120,45 @@ impl From<&Member> for HashMap<String, AttributeValue> {
         if let Some(mobile) = &member.mobile {
             map.insert("mobile".to_string(), AttributeValue::N(mobile.to_string()));
         }
+        map.insert("subscriptions".to_string(), AttributeValue::Ss(member.subscriptions.clone()));
+        return map;
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Topic {
+    pub id: Option<String>,
+    pub name: String,
+    pub endpoint: String,
+    pub default: bool,
+}
+
+impl Topic {
+
+    pub fn from_row(data: &HashMap<String, AttributeValue>) -> Result<Self, RuntimeError> {
+        let id = read_string(data, "id")?.to_string();
+        let name = read_string(data, "name")?.to_string();
+        let endpoint = read_string(data, "endpoint")?.to_string();
+        let default = read_bool(data, "address")?;
+        Ok(Topic {
+            id: Some(id),
+            name,
+            endpoint,
+            default,
+        })
+    }
+}
+
+impl From<&Topic> for HashMap<String, AttributeValue> {
+    // TODO generate this using a macro
+    fn from(topic: &Topic) -> Self {
+        let mut map = HashMap::new();
+        if let Some(id) = &topic.id {
+            map.insert("id".to_string(), AttributeValue::S(id.clone()));
+        }
+        map.insert("name".to_string(), AttributeValue::S(topic.name.clone()));
+        map.insert("endpoint".to_string(), AttributeValue::S(topic.endpoint.clone()));
+        map.insert("default".to_string(), AttributeValue::Bool(topic.default));
         return map;
     }
 }

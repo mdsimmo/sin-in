@@ -1,5 +1,5 @@
 [package]
-name = "list-members"
+name = "members-delete"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 serde = "1"
 serde_json = "1"
 log = "0.4.17"
-http = "0.2.8"
-tracing-subscriber = "0.3"
-aws-sdk-dynamodb = "0.24"
-aws-config = "0.54"
+http = "0.2.9"
+tracing-subscriber = "0.3.16"
+aws-sdk-dynamodb = "0.25.1"
+aws-config = "0.55.0"
