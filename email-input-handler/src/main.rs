@@ -1,7 +1,7 @@
 use app_core::{Member, Topic};
-use aws_lambda_events::ses::SimpleEmailEvent;
+use aws_lambda_events::{sns::SnsMessage, sqs::SqsEvent,ses::SimpleEmailService};
 use aws_sdk_dynamodb::primitives::Blob;
-use aws_sdk_sesv2::types::{Destination, EmailContent, RawMessage};
+use aws_sdk_sesv2::{types::{Destination, EmailContent, RawMessage}};
 use lambda_runtime::{service_fn, LambdaEvent, Error};
 use serde_json::Value;
 use tokio::try_join;
@@ -24,7 +24,7 @@ async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
 
     let (event_value, _context) = event.into_parts();   
     log::info!("event: {:?}", event_value);
-    let email_event: SimpleEmailEvent = serde_json::from_value(event_value)?;
+    let sqs_event: SqsEvent = serde_json::from_value(event_value)?;
 
     log::info!("Connecting clients...");
     let config = aws_config::load_from_env().await;
@@ -35,11 +35,16 @@ async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
     log::info!("Fetching endpoint & members...");
     let (routes, members) = try_join!(get_routes(&dyno_client), get_members(&dyno_client))?;
 
-    for record in &email_event.records {
-        let a = &record.ses.mail.common_headers.from;
-        let message_id = record.ses.mail.message_id.as_ref().unwrap();
+    for sqs_record in &sqs_event.records {
+        log::info!("Decoding SNS Record");
+        let sns_message: SnsMessage = serde_json::from_str(&sqs_record.body.as_ref().unwrap())?;
+        log::info!("Decoding SES Record");
+        let ses_service: SimpleEmailService = serde_json::from_str(&sns_message.message)?;
+        log::info!("Get message id");
+        let message_id = ses_service.mail.message_id.unwrap();
         let email = get_email(&message_id, &s3_client).await?; // TODO parralise awaits
-        for target in &record.ses.mail.destination { 
+        
+        for target in &ses_service.mail.destination { 
             if let Some(topic) = routes.iter().find(|topic| &topic.endpoint == target) {
                 queue_emails(&topic, &members, &email, &ses_client).await?; // TODO parralise awaits
             } else {
@@ -148,7 +153,7 @@ async fn get_members(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Member>, E
     let table_response = client.scan()
         .table_name("sinln-members")
         .send().await;
-    log::info!("Table data: {:?}", table_response);
+    log::info!("Members data: {:?}", table_response);
     let table_response = table_response?;
 
     // Convert json into members
