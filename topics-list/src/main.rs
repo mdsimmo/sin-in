@@ -1,6 +1,5 @@
-use app_server_core::{Topic, ServerSerialize, run_handler, StringResponse, TopicsListRequest, TopicsListResponse};
+use app_server_core::{Topic, crud::list_items, ListResponse, ListRequest, runtime::{StringResponse, run_handler}};
 use lambda_http::{run, service_fn, Error, Request};
-use aws_sdk_dynamodb::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -17,35 +16,6 @@ async fn function_handler_wrap(event: Request) -> Result<StringResponse, Error> 
     run_handler(&function_handler, event).await
 }
 
-pub async fn function_handler(_: TopicsListRequest) -> Result<TopicsListResponse, Error> {
-    // Get all topics in dynamodb
-    let config = aws_config::load_from_env().await;
-    let client = Client::new(&config);
-    let table_response = client.scan()
-        .table_name("sinln-topics")
-        .send().await;
-    log::info!("Table data: {:?}", table_response);
-    let table_response = table_response?;
-
-    // Convert json into topics
-    let result = table_response.items()
-        .map(|items| {
-            let topics: Vec<Topic> = items.into_iter().filter_map(|row| {
-                match Topic::from_row(row) {
-                    Ok(m) => Some(m),
-                    Err(_err) => None,
-                }
-            }).collect();
-            topics
-        });
-    
-    // TODO Handle the case of None
-    let topics = match result {
-        Some(x) => x,
-        None => return Err(Box::new(app_server_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
-    };
-    
-    Ok(TopicsListResponse {
-        topics
-    })
+pub async fn function_handler(_event: ListRequest) -> Result<ListResponse<Topic>, Error> {
+    list_items(_event, "sinln-topics").await
 }

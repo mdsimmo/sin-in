@@ -1,4 +1,4 @@
-use app_server_core::{Member, Topic, ServerSerialize};
+use app_server_core::{Member, Topic, serialize::ServerSerialize};
 use aws_lambda_events::{sns::SnsMessage, sqs::SqsEvent,ses::SimpleEmailService};
 use aws_sdk_dynamodb::primitives::Blob;
 use aws_sdk_sesv2::types::{Destination, EmailContent, RawMessage};

@@ -38,9 +38,12 @@ name = "app-server-core"
 version = "0.1.0"
 dependencies = [
  "app-core",
+ "aws-config",
  "aws-sdk-dynamodb",
  "lambda_http",
+ "log",
  "model",
+ "rand 0.8.5",
  "serde",
  "serde_json",
 ]
