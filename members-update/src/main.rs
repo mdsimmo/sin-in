@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-use app_core::{Member, add_cors};
-use http::Response;
-use lambda_http::{run, http::StatusCode, service_fn, Error, Request, RequestExt};
+use app_server_core::{Member, ServerSerialize, StringResponse, run_handler, MembersUpdateRequest, MembersUpdateResponse};
+use lambda_http::{run, service_fn, Error, Request};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use aws_sdk_dynamodb::{Client, types::{ReturnValue}};
+use aws_sdk_dynamodb::{Client, types::ReturnValue};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -15,44 +11,16 @@ async fn main() -> Result<(), Error> {
         .with_max_level(tracing_subscriber::filter::LevelFilter::INFO)
         .init();
 
-    run(service_fn(function_error_wrap)).await
+    run(service_fn(function_handler_wrap)).await
 }
 
-pub async fn function_error_wrap(event: Request) -> Result<app_core::StringResponse, Error> {
-    let result = function_handler(event).await;
-    let result = match result {
-        Ok(r) => Ok(r),
-        Err(e) => {
-            let new_response = Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header("Content-Type", "application/json")
-            .header("Access-Control-Allow-Origin", "http://localhost:3000")
-            .body(json!({
-                "error": e.to_string(),
-                "source": match e.source() {
-                    Some(cause) => cause.to_string(),
-                    None => "none".to_string(),
-                }
-              }).to_string())
-            .map_err(Box::new)?;
-            Ok(new_response)
-        }
-    };
-    return add_cors(result);
+async fn function_handler_wrap(event: Request) -> Result<StringResponse, Error> {
+    run_handler(&function_handler, event).await
 }
 
 
-pub async fn function_handler(event: Request) -> Result<app_core::StringResponse, Error> {
-    log::info!("Event: {:?}", event);
-    
-    // decrypt the request
-    let raw_data = event.payload::<Data>()?;
-    log::info!("Data: {:?}", raw_data);
-    let data = match raw_data {
-        Some(x) => x,
-        None => return Err(Box::new(app_core::RuntimeError::from_str("No data given")))
-    };
-    let mut member = data.member;
+pub async fn function_handler(input: MembersUpdateRequest) -> Result<MembersUpdateResponse, Error> {
+    let mut member = input.member;
 
     // If no id assigned, assign one
     if member.id == None {
@@ -69,7 +37,7 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
     let client = Client::new(&config);
     let table_response = client.put_item()
         .table_name("sinln-members")
-        .set_item(Some(HashMap::from(&member)))
+        .set_item(Some(member.into_row()))
         .return_values(ReturnValue::AllOld)
         .send().await;
     log::info!("Table update: {:?}", table_response);
@@ -83,20 +51,8 @@ pub async fn function_handler(event: Request) -> Result<app_core::StringResponse
         _ => None,
     };
 
-    // Send response
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "application/json")
-        .body(json!({
-            "member": member, 
-            "old-member": old_member,
-          }).to_string())
-        .map_err(Box::new)?;
-
-    Ok(response)
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct Data {
-    member: Member,
+    Ok(MembersUpdateResponse {
+        member,
+        old_member,
+    })
 }

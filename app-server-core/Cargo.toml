@@ -1,0 +1,13 @@
+[package]
+name = "app-server-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+app-core = { path = "../app-core" }
+serde = "1"
+serde_json = "1"
+lambda_http = "0.7"
+model = "0.1.2"
+aws-sdk-dynamodb = ">=0"

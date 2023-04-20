@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "app-core",
+  "app-server-core",
   "members-update",
   "members-delete",
   "members-list",

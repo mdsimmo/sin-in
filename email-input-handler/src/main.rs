@@ -1,7 +1,7 @@
-use app_core::{Member, Topic};
+use app_server_core::{Member, Topic, ServerSerialize};
 use aws_lambda_events::{sns::SnsMessage, sqs::SqsEvent,ses::SimpleEmailService};
 use aws_sdk_dynamodb::primitives::Blob;
-use aws_sdk_sesv2::{types::{Destination, EmailContent, RawMessage}};
+use aws_sdk_sesv2::types::{Destination, EmailContent, RawMessage};
 use lambda_runtime::{service_fn, LambdaEvent, Error};
 use serde_json::Value;
 use tokio::try_join;
@@ -15,8 +15,7 @@ async fn main() -> Result<(), Error> {
         .init();
 
     let func = service_fn(handler);
-    lambda_runtime::run(func).await?;
-    Ok(())
+    lambda_runtime::run(func).await
 }
 
 async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
@@ -143,7 +142,7 @@ async fn get_routes(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Topic>, Err
     // TODO Handle the case of None
     let topics = match result {
         Some(x) => x,
-        None => return Err(Box::new(app_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
+        None => return Err(Box::new(app_server_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
     };
 
     Ok(topics)
@@ -171,7 +170,7 @@ async fn get_members(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Member>, E
     // TODO Handle the case of None
     let members = match result {
         Some(x) => x,
-        None => return Err(Box::new(app_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
+        None => return Err(Box::new(app_server_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
     };
 
     Ok(members)

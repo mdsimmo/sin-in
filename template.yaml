@@ -35,8 +35,9 @@ Resources:
         CertificateArn: !Ref DomainCertificate
       CorsConfiguration:
         AllowOrigins:
-          - "http://localhost:3000"
           - "https://sinln.mdsimmo.com"
+          - "http://localhost:3000"
+          - "http://localhost:8080"
         AllowHeaders:
           - "*"
         AllowMethods:

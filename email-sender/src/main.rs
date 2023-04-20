@@ -1,4 +1,4 @@
-use app_core::{Member, Topic};
+use app_server_core::{Member, Topic};
 use aws_sdk_sesv2::types::{Destination, Body, Content, Message, EmailContent};
 use lambda_http::{Error};
 
