@@ -72,7 +72,7 @@ impl ServerSerialize for Topic {
         let id = read_string(data, "id")?.to_string();
         let name = read_string(data, "name")?.to_string();
         let endpoint = read_string(data, "endpoint")?.to_string();
-        let default = read_bool(data, "address")?;
+        let default = read_bool(data, "default")?;
         Ok(Topic {
             id: Some(id),
             name,

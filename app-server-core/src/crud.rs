@@ -32,7 +32,7 @@ pub async fn list_items<T: ServerSerialize>(_event: ListRequest, table: &str) ->
     // TODO Handle the case of None
     let items = match result {
         Some(x) => x,
-        None => return Err(Box::new(RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
+        None => return Err(RuntimeError::from_str("Scan resulted in None? Why would that happen?").into()),
     };
     
     Ok(ListResponse {
