@@ -1,5 +1,6 @@
 pub use app_core::*;
 pub use app_core::api::*;
+use serde::{Deserialize, Serialize};
 
 pub mod serialize;
 pub mod runtime;
@@ -38,4 +39,12 @@ impl std::error::Error for RuntimeError {
     fn description(&self) -> &str {
         &self.details
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct EmailRequest {
+    pub topic: Topic,
+    pub member: Member,
+    pub email_id: String,
+    pub confirm_link: bool,
 }

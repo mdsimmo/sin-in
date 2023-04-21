@@ -1,10 +1,7 @@
-use app_server_core::{Member, Topic, serialize::ServerSerialize};
+use app_server_core::{Member, Topic, serialize::ServerSerialize, EmailRequest};
 use aws_lambda_events::{sns::SnsMessage, sqs::SqsEvent,ses::SimpleEmailService};
-use aws_sdk_dynamodb::primitives::Blob;
-use aws_sdk_sesv2::types::{Destination, EmailContent, RawMessage};
 use lambda_runtime::{service_fn, LambdaEvent, Error};
 use serde_json::Value;
-use tokio::try_join;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -14,8 +11,7 @@ async fn main() -> Result<(), Error> {
         .with_max_level(tracing_subscriber::filter::LevelFilter::INFO)
         .init();
 
-    let func = service_fn(handler);
-    lambda_runtime::run(func).await
+    lambda_runtime::run(service_fn(handler)).await
 }
 
 async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
@@ -24,15 +20,14 @@ async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
     let (event_value, _context) = event.into_parts();   
     log::info!("event: {:?}", event_value);
     let sqs_event: SqsEvent = serde_json::from_value(event_value)?;
-
+    
     log::info!("Connecting clients...");
     let config = aws_config::load_from_env().await;
-    let ses_client = aws_sdk_sesv2::Client::new(&config);
+    let sqs_client = aws_sdk_sqs::Client::new(&config);
     let dyno_client = aws_sdk_dynamodb::Client::new(&config);
-    let s3_client = aws_sdk_s3::Client::new(&config);
 
     log::info!("Fetching endpoint & members...");
-    let (routes, members) = try_join!(get_routes(&dyno_client), get_members(&dyno_client))?;
+    let topics = get_topics(&dyno_client).await?;
 
     for sqs_record in &sqs_event.records {
         log::info!("Decoding SNS Record");
@@ -41,20 +36,20 @@ async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
         let ses_service: SimpleEmailService = serde_json::from_str(&sns_message.message)?;
         log::info!("Get message id");
         let message_id = ses_service.mail.message_id.unwrap();
-        let email = get_email(&message_id, &s3_client).await?; // TODO parralise awaits
-        
+
         for target in &ses_service.mail.destination { 
-            if let Some(topic) = routes.iter().find(|topic| &topic.endpoint == target) {
-                queue_emails(&topic, &members, &email, &ses_client).await?; // TODO parralise awaits
-            } else {
-                let topic = Topic {
-                    id: Some("hello".to_string()),
-                    name: "hello".to_string(),
-                    endpoint: "hello@mdsimmo.com".to_string(),
-                    default: true,
+            if let Some(topic) = topics.iter().find(|topic| &topic.endpoint == target) {
+                let member = Member {
+                    id: Some("---".to_owned()),
+                    name: "Sender".to_owned(),
+                    email: ses_service.mail.source.as_ref().unwrap().to_owned(),
+                    address: None,
+                    mobile: None,
+                    subscriptions: vec![],
                 };
-                queue_emails(&topic, &members, &email, &ses_client).await?; // TODO parralise awaits
-                //todo!("What to do if there is no route???");
+                queue_email(&topic, &member, &message_id, &sqs_client).await?;
+            } else {
+                todo!("Send bad endpoint email back");
             }
         }
     }
@@ -62,65 +57,26 @@ async fn handler(event: LambdaEvent<Value>) -> Result<(), Error> {
     Ok(())
 }
 
-async fn queue_emails(topic: &Topic, members: &Vec<Member>, email: &str, client: &aws_sdk_sesv2::Client) -> Result<(), Error> {
-    for member in members {
-        //if member.subscriptions.iter().any(|sub| route.endpoint.contains(sub)) {
-            queue_email(topic, member, client, email).await?;
-        //}
-    }
-    Ok(())
-}
+async fn queue_email(topic: &Topic, member: &Member, email_id: &str, client: &aws_sdk_sqs::Client) -> Result<(), Error> {
+    let event = EmailRequest {
+        topic: topic.clone(),
+        member: member.clone(),
+        email_id: email_id.to_owned(),
+        confirm_link: true,
+    };
 
-async fn queue_email(topic: &Topic, member: &Member, client: &aws_sdk_sesv2::Client, email: &str) -> Result<(), Error> {
-    log::info!("Build destination");
-    let destintation = Destination::builder()
-        .to_addresses(&member.email)
-        .build();
-
-    log::info!("Build content");
-    let raw_message = RawMessage::builder()
-        .data(Blob::new(email))
-        .build();
-
-    let content = EmailContent::builder()
-        .raw(raw_message)
-        .build();
-
-    log::info!("Build reponse");
-    let response = client.send_email()
-        .content(content)
-        .from_email_address(&topic.endpoint)
-        .destination(destintation)
+    let result = client.send_message()
+        .queue_url("https://sqs.us-east-1.amazonaws.com/400928329577/sinln-output-queue") // TODO don't hard code output queue URL
+        .message_body(serde_json::to_string(&event)?)
         .send()
         .await?;
 
-    log::info!("Response: {:?}", response);
-    
+    log::info!("Email queue: {:?}", result);
+
     Ok(())
 }
 
-async fn get_email(message_id: &str, client: &aws_sdk_s3::Client) -> Result<String, Error> {
-    /*let copy_result = client.copy_object()
-        .bucket("sinln-input-emails")
-        .copy_source("sinln-input-emails/.".to_string() + message_id)
-        .key(message_id)
-        .acl(aws_sdk_s3::types::ObjectCannedAcl::Private)
-        .content_type("text/plain")
-        .storage_class(StorageClass::Standard)
-        .send().await?;*/
-    
-    let get_result = client.get_object()
-        .bucket("sinln-input-emails")
-        .key(message_id)
-        .send().await?;
-
-    let bytes = get_result.body.collect().await?.into_bytes();
-    let email_data = std::str::from_utf8(&bytes)?;
-
-    Ok(email_data.to_string())
-}
-
-async fn get_routes(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Topic>, Error> {
+async fn get_topics(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Topic>, Error> {
     let table_response = client.scan()
         .table_name("sinln-topics")
         .send().await;
@@ -146,32 +102,4 @@ async fn get_routes(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Topic>, Err
     };
 
     Ok(topics)
-}
-
-async fn get_members(client: &aws_sdk_dynamodb::Client) -> Result<Vec<Member>, Error> {
-    let table_response = client.scan()
-        .table_name("sinln-members")
-        .send().await;
-    log::info!("Members data: {:?}", table_response);
-    let table_response = table_response?;
-
-    // Convert json into members
-    let result = table_response.items()
-        .map(|items| {
-            let members: Vec<Member> = items.into_iter().filter_map(|row| {
-                match Member::from_row(row) {
-                    Ok(m) => Some(m),
-                    Err(_err) => None,
-                }
-            }).collect();
-            members
-        });
-    
-    // TODO Handle the case of None
-    let members = match result {
-        Some(x) => x,
-        None => return Err(Box::new(app_server_core::RuntimeError::from_str("Scan resulted in None? Why would that happen?"))),
-    };
-
-    Ok(members)
 }

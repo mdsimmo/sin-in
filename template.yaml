@@ -252,15 +252,26 @@ Resources:
           Endpoint: !GetAtt EmailInputQueue.Arn
   
   # Queue for all input message to get processed
-  # TODO: Add a deadletter queue
   EmailInputQueue:
     Type: AWS::SQS::Queue
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
     Properties:
-      QueueName: 'sinln-email-input-queue'
+      QueueName: 'sinln-email-input'
       MessageRetentionPeriod: 345600 # 4 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmailInputQueueDead.Arn
+        maxReceiveCount: 1
 
+  # Queue to hold emails that failed to deliver
+  EmailInputQueueDead:
+    Type: AWS::SQS::Queue
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      QueueName: 'sinln-email-input-dead'
+      MessageRetentionPeriod: 345600 # 4 days
+      
   # All emails in the Input Queue trigger the Email Handler
   EmailInputTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -271,6 +282,27 @@ Resources:
       EventSourceArn: !GetAtt EmailInputQueue.Arn
       FunctionName: !GetAtt EmailInputHandler.Arn
 
+  # Function that handles receiving confirmation to send emails to everyone
+  EmailConfirm:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sinln-email-confirm
+      CodeUri: email-confirm/
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /email-confirm
+            Method: Post 
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TopicsTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt EmailOutputQueue.QueueName
+  
   # Function that processes all input emails
   EmailInputHandler:
     Type: AWS::Serverless::Function
@@ -282,12 +314,10 @@ Resources:
             TableName: !Ref MembersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref TopicsTable
-        - S3CrudPolicy:
-            BucketName: !Ref EmailInputStore
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailInputQueue.QueueName
-        - SESCrudPolicy:
-            IdentityName: '*'
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt EmailOutputQueue.QueueName
 
   # Let the handler be called from SQS
   EmailInputHandlerPolicy:
@@ -306,18 +336,17 @@ Resources:
     Properties:
       QueueName: sinln-output-queue
       MessageRetentionPeriod: 345600 # 4 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmailOutputQueueDead.Arn
+        maxReceiveCount: 1
 
-  EmailOutputStore:
-    Type: AWS::S3::Bucket
+  EmailOutputQueueDead:
+    Type: AWS::SQS::Queue
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
     Properties:
-      BucketName: sinln-output-emails
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+      QueueName: sinln-output-queue-dead
+      MessageRetentionPeriod: 345600 # 4 days
 
   EmailSender:
     Type: AWS::Serverless::Function
@@ -327,10 +356,10 @@ Resources:
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailOutputQueue.QueueName
-        - S3CrudPolicy:
-            BucketName: !Ref EmailOutputStore
         - SESCrudPolicy:
-            IdentityName: !Ref EmailIdentity
+            IdentityName: '*' 
+        - S3CrudPolicy:
+            BucketName: !Ref EmailInputStore
 
   EmailSenderPolicy:
     Type: AWS::Lambda::Permission

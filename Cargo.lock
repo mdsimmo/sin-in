@@ -238,6 +238,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-sqs"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "455c218364c68bde3229be8eea1b93535f9efe8e521875f33a8541da6d278099"
+dependencies = [
+ "aws-credential-types",
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-query",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "bytes",
+ "http",
+ "regex",
+ "tokio-stream",
+ "tower",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-sso"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -580,6 +607,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "buf-read-ext"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd2b3bef6c7a0f62d42a25a3cce9a40d558f3f4e15b70a7eef4aaea5c2a419ab"
+
+[[package]]
 name = "bumpalo"
 version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -807,6 +840,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
 
 [[package]]
+name = "email-confirm"
+version = "0.1.0"
+dependencies = [
+ "app-server-core",
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "aws-sdk-s3",
+ "aws-sdk-sesv2",
+ "aws-sdk-sqs",
+ "aws_lambda_events 0.8.3",
+ "http",
+ "lambda_http",
+ "lambda_runtime",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "email-format"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be0f5daebe16c81643c4a1dbde2d296fc811927a447edb90ae44fa7e806fc537"
+dependencies = [
+ "buf-read-ext",
+]
+
+[[package]]
 name = "email-input-handler"
 version = "0.1.0"
 dependencies = [
@@ -815,6 +878,7 @@ dependencies = [
  "aws-sdk-dynamodb",
  "aws-sdk-s3",
  "aws-sdk-sesv2",
+ "aws-sdk-sqs",
  "aws_lambda_events 0.8.3",
  "lambda_runtime",
  "log",
@@ -831,8 +895,10 @@ dependencies = [
  "app-server-core",
  "aws-config",
  "aws-sdk-dynamodb",
+ "aws-sdk-s3",
  "aws-sdk-sesv2",
- "http",
+ "aws_lambda_events 0.8.3",
+ "email-format",
  "lambda_http",
  "lambda_runtime",
  "log",

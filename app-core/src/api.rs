@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Topic;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DeleteRequest {
     pub ids: Vec<String>,
@@ -29,4 +31,16 @@ pub struct ListRequest {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ListResponse<T> {
     pub items: Vec<T>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ConfirmEmailRequest {
+    pub topic_id: String,
+    pub email_id: String,
+}
+
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ConfirmEmailResponse {
+    pub topic: Option<Topic>,
 }
